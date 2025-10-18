@@ -1,0 +1,6 @@
+@CT600Submission_HostAddress = http://localhost:5036
+
+GET {{CT600Submission_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
