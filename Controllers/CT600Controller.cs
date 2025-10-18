@@ -23,6 +23,14 @@ public class CT600Controller : ControllerBase
     }
 
     /// <summary>
+    /// Sanitizes a string to prevent log forging attacks by removing newline characters
+    /// </summary>
+    private static string SanitizeForLogging(string input)
+    {
+        return input?.Replace("\n", "").Replace("\r", "") ?? string.Empty;
+    }
+
+    /// <summary>
     /// Get all CT600 data from Google Sheets
     /// </summary>
     [HttpGet]
@@ -57,7 +65,7 @@ public class CT600Controller : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving CT600 data for reference {Reference}", taxReference);
+            _logger.LogError(ex, "Error retrieving CT600 data for reference {Reference}", SanitizeForLogging(taxReference));
             return StatusCode(500, new { error = "Failed to retrieve data", message = ex.Message });
         }
     }
@@ -85,7 +93,7 @@ public class CT600Controller : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating CT600 data for reference {Reference}", taxReference);
+            _logger.LogError(ex, "Error updating CT600 data for reference {Reference}", SanitizeForLogging(taxReference));
             return StatusCode(500, new { error = "Failed to update data", message = ex.Message });
         }
     }
@@ -153,7 +161,7 @@ public class CT600Controller : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error submitting CT600 for reference {Reference}", taxReference);
+            _logger.LogError(ex, "Error submitting CT600 for reference {Reference}", SanitizeForLogging(taxReference));
             return StatusCode(500, new { error = "Failed to submit CT600", message = ex.Message });
         }
     }
@@ -191,7 +199,7 @@ public class CT600Controller : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting submission status for reference {Reference}", taxReference);
+            _logger.LogError(ex, "Error getting submission status for reference {Reference}", SanitizeForLogging(taxReference));
             return StatusCode(500, new { error = "Failed to get submission status", message = ex.Message });
         }
     }
