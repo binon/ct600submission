@@ -10,6 +10,7 @@ public class HmrcService
     private readonly IConfiguration _configuration;
     private readonly ILogger<HmrcService> _logger;
     private HmrcAuthToken? _currentToken;
+    private readonly object _tokenLock = new object();
 
     public HmrcService(HttpClient httpClient, IConfiguration configuration, ILogger<HmrcService> logger)
     {
@@ -19,6 +20,11 @@ public class HmrcService
 
         var baseUrl = configuration["Hmrc:BaseUrl"] ?? "https://test-api.service.hmrc.gov.uk";
         _httpClient.BaseAddress = new Uri(baseUrl);
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        
+        // Add security headers
+        _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "CT600-Submission/1.0");
     }
 
     public Task<string> GetAuthorizationUrlAsync()
@@ -64,7 +70,7 @@ public class HmrcService
                 throw new InvalidOperationException("Failed to deserialize token response");
             }
 
-            _currentToken = new HmrcAuthToken
+            var newToken = new HmrcAuthToken
             {
                 AccessToken = tokenData["access_token"]?.ToString() ?? "",
                 TokenType = tokenData["token_type"]?.ToString() ?? "Bearer",
@@ -73,7 +79,12 @@ public class HmrcService
                 RefreshToken = tokenData.ContainsKey("refresh_token") ? tokenData["refresh_token"]?.ToString() : null
             };
 
-            return _currentToken;
+            lock (_tokenLock)
+            {
+                _currentToken = newToken;
+            }
+
+            return newToken;
         }
         catch (Exception ex)
         {
@@ -86,7 +97,13 @@ public class HmrcService
     {
         try
         {
-            if (_currentToken == null || DateTime.UtcNow >= _currentToken.ExpiresAt)
+            HmrcAuthToken? token;
+            lock (_tokenLock)
+            {
+                token = _currentToken;
+            }
+
+            if (token == null || DateTime.UtcNow >= token.ExpiresAt)
             {
                 throw new InvalidOperationException("Authentication token is missing or expired. Please authenticate first.");
             }
@@ -106,7 +123,7 @@ public class HmrcService
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             _httpClient.DefaultRequestHeaders.Authorization = 
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _currentToken.AccessToken);
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.AccessToken);
 
             var response = await _httpClient.PostAsync("/corporation-tax/ct600/submit", content);
             response.EnsureSuccessStatusCode();
@@ -131,13 +148,19 @@ public class HmrcService
     {
         try
         {
-            if (_currentToken == null || DateTime.UtcNow >= _currentToken.ExpiresAt)
+            HmrcAuthToken? token;
+            lock (_tokenLock)
+            {
+                token = _currentToken;
+            }
+
+            if (token == null || DateTime.UtcNow >= token.ExpiresAt)
             {
                 throw new InvalidOperationException("Authentication token is missing or expired. Please authenticate first.");
             }
 
             _httpClient.DefaultRequestHeaders.Authorization = 
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _currentToken.AccessToken);
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.AccessToken);
 
             var response = await _httpClient.GetAsync($"/corporation-tax/ct600/status/{submissionReference}");
             response.EnsureSuccessStatusCode();
@@ -171,6 +194,9 @@ public class HmrcService
 
     public bool IsAuthenticated()
     {
-        return _currentToken != null && DateTime.UtcNow < _currentToken.ExpiresAt;
+        lock (_tokenLock)
+        {
+            return _currentToken != null && DateTime.UtcNow < _currentToken.ExpiresAt;
+        }
     }
 }

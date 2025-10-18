@@ -21,6 +21,9 @@ public class GoogleSheetsService
         var credentialsPath = configuration["GoogleSheets:CredentialsPath"] ?? "credentials.json";
         GoogleCredential credential;
         
+        // Note: GoogleCredential.FromStream is deprecated in favor of CredentialFactory.
+        // However, CredentialFactory requires additional setup and the current method
+        // still works correctly. Consider migrating to CredentialFactory in a future update.
         #pragma warning disable CS0618 // Type or member is obsolete
         using (var stream = new FileStream(credentialsPath, FileMode.Open, FileAccess.Read))
         {
