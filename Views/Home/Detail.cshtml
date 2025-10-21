@@ -1,0 +1,260 @@
+@{
+    ViewData["Title"] = "CT600 Detail";
+    var taxReference = ViewData["TaxReference"] as string;
+}
+
+<div id="alertContainer"></div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-file-earmark-text"></i> CT600 Details</h1>
+            <a href="/" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-building"></i> Company Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="loadingSpinner" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading CT600 details...</p>
+                </div>
+                <div id="detailForm" style="display: none;">
+                    <form id="ct600Form">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" class="form-control" id="companyName" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Company Registration Number</label>
+                                <input type="text" class="form-control" id="companyRegistrationNumber" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tax Reference</label>
+                                <input type="text" class="form-control" id="taxReference" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Period Start</label>
+                                <input type="date" class="form-control" id="periodStart" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Period End</label>
+                                <input type="date" class="form-control" id="periodEnd" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Turnover (£)</label>
+                                <input type="number" class="form-control" id="turnover" step="0.01" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Taxable Profit (£)</label>
+                                <input type="number" class="form-control" id="taxableProfit" step="0.01" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tax Due (£)</label>
+                                <input type="number" class="form-control" id="taxDue" step="0.01" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <input type="text" class="form-control" id="status" readonly>
+                            </div>
+                            <div class="col-md-6" id="submissionDateContainer" style="display: none;">
+                                <label class="form-label">Submission Date</label>
+                                <input type="text" class="form-control" id="submissionDate" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3" id="submissionRefContainer" style="display: none;">
+                            <div class="col-md-12">
+                                <label class="form-label">Submission Reference</label>
+                                <input type="text" class="form-control" id="submissionReference" readonly>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Actions</h5>
+            </div>
+            <div class="card-body">
+                <div id="actionsContainer" style="display: none;">
+                    <div class="d-grid gap-2">
+                        <button id="submitBtn" class="btn btn-success" onclick="submitCT600()" style="display: none;">
+                            <i class="bi bi-send"></i> Submit to HMRC
+                        </button>
+                        <button id="statusBtn" class="btn btn-info" onclick="checkStatus()" style="display: none;">
+                            <i class="bi bi-info-circle"></i> Check Status
+                        </button>
+                        <hr>
+                        <a href="/" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3" id="statusCard" style="display: none;">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Submission Info</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Reference:</strong> <span id="infoReference"></span></p>
+                <p><strong>Date:</strong> <span id="infoDate"></span></p>
+                <p class="mb-0"><strong>Status:</strong> <span id="infoStatus"></span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const taxRef = '@Html.Raw(taxReference ?? "")';
+
+        $(document).ready(function() {
+            if (taxRef) {
+                loadDetail();
+            } else {
+                showError('No tax reference provided');
+            }
+        });
+
+        function loadDetail() {
+            $('#loadingSpinner').show();
+            $('#detailForm').hide();
+            $('#actionsContainer').hide();
+            $('#errorMessage').hide();
+
+            $.ajax({
+                url: API_BASE_URL + '/api/ct600/' + encodeURIComponent(taxRef),
+                method: 'GET',
+                success: function(data) {
+                    displayDetail(data);
+                    $('#loadingSpinner').hide();
+                    $('#detailForm').show();
+                    $('#actionsContainer').show();
+                },
+                error: function(xhr) {
+                    $('#loadingSpinner').hide();
+                    const errorMsg = xhr.responseJSON?.error || 'Failed to load CT600 details';
+                    showError(errorMsg);
+                }
+            });
+        }
+
+        function displayDetail(data) {
+            $('#companyName').val(data.companyName);
+            $('#companyRegistrationNumber').val(data.companyRegistrationNumber);
+            $('#taxReference').val(data.taxReference);
+            $('#periodStart').val(formatDate(data.periodStart));
+            $('#periodEnd').val(formatDate(data.periodEnd));
+            $('#turnover').val(data.turnover);
+            $('#taxableProfit').val(data.taxableProfit);
+            $('#taxDue').val(data.taxDue);
+            $('#status').val(data.status);
+
+            // Show/hide action buttons based on status
+            if (data.status === 'Draft') {
+                $('#submitBtn').show();
+                $('#statusBtn').hide();
+                $('#statusCard').hide();
+            } else if (data.status === 'Submitted' && data.submissionReference) {
+                $('#submitBtn').hide();
+                $('#statusBtn').show();
+                $('#statusCard').show();
+                $('#infoReference').text(data.submissionReference);
+                $('#infoDate').text(new Date(data.submissionDate).toLocaleString());
+                $('#infoStatus').text(data.status);
+            } else {
+                $('#submitBtn').hide();
+                $('#statusBtn').hide();
+            }
+
+            // Show submission details if available
+            if (data.submissionDate) {
+                $('#submissionDate').val(new Date(data.submissionDate).toLocaleString());
+                $('#submissionDateContainer').show();
+            }
+            if (data.submissionReference) {
+                $('#submissionReference').val(data.submissionReference);
+                $('#submissionRefContainer').show();
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toISOString().split('T')[0];
+        }
+
+        function submitCT600() {
+            if (!confirm('Are you sure you want to submit this CT600 to HMRC?')) {
+                return;
+            }
+
+            showAlert('Submitting CT600 to HMRC...', 'info');
+
+            $.ajax({
+                url: API_BASE_URL + '/api/ct600/' + encodeURIComponent(taxRef) + '/submit',
+                method: 'POST',
+                success: function(response) {
+                    showAlert('CT600 submitted successfully! Reference: ' + response.submissionReference, 'success');
+                    setTimeout(function() {
+                        loadDetail();
+                    }, 2000);
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON?.error || 'Failed to submit CT600';
+                    showAlert(errorMsg, 'danger');
+                }
+            });
+        }
+
+        function checkStatus() {
+            showAlert('Checking submission status...', 'info');
+
+            $.ajax({
+                url: API_BASE_URL + '/api/ct600/' + encodeURIComponent(taxRef) + '/status',
+                method: 'GET',
+                success: function(response) {
+                    const statusMsg = `
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Date:</strong> ${new Date(response.statusDate).toLocaleString()}<br>
+                        ${response.message ? '<strong>Message:</strong> ' + response.message : ''}
+                    `;
+                    showAlert(statusMsg, 'info');
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON?.error || 'Failed to check status';
+                    showAlert(errorMsg, 'danger');
+                }
+            });
+        }
+
+        function showError(message) {
+            $('#errorMessage').text(message).show();
+        }
+    </script>
+}

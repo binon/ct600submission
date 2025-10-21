@@ -1,0 +1,196 @@
+@{
+    ViewData["Title"] = "Authentication";
+}
+
+<div id="alertContainer"></div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-shield-lock"></i> HMRC Authentication</h1>
+        <p class="lead">Authenticate with HMRC to submit CT600 returns</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-key"></i> Authentication Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="authStatusContainer">
+                    <div class="d-flex align-items-center mb-3">
+                        <div id="statusIndicator" class="me-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 id="statusText" class="mb-0">Checking authentication status...</h5>
+                            <small id="statusDetail" class="text-muted"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="notAuthenticatedActions" style="display: none;">
+                    <hr>
+                    <h6>To authenticate with HMRC:</h6>
+                    <ol>
+                        <li>Click the "Start Authentication" button below</li>
+                        <li>You'll receive an authorization URL</li>
+                        <li>Visit the URL in your browser</li>
+                        <li>Log in with your HMRC credentials</li>
+                        <li>Authorize the application</li>
+                        <li>You'll be redirected back to this application</li>
+                    </ol>
+                    <button class="btn btn-primary btn-lg mt-3" onclick="startAuth()">
+                        <i class="bi bi-box-arrow-in-right"></i> Start Authentication
+                    </button>
+                </div>
+
+                <div id="authenticatedActions" style="display: none;">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> 
+                        You are authenticated with HMRC. You can now submit CT600 returns.
+                    </div>
+                    <a href="/" class="btn btn-primary">
+                        <i class="bi bi-speedometer2"></i> Go to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Information</h5>
+            </div>
+            <div class="card-body">
+                <h6>About HMRC Authentication</h6>
+                <p class="small">
+                    This application uses OAuth2 to securely authenticate with HMRC's API. 
+                    Your credentials are never stored in this application.
+                </p>
+                <hr>
+                <h6>Requirements</h6>
+                <ul class="small">
+                    <li>HMRC Government Gateway credentials</li>
+                    <li>Registered application with HMRC Developer Hub</li>
+                    <li>Valid OAuth2 client ID and secret</li>
+                </ul>
+                <hr>
+                <h6>Testing</h6>
+                <p class="small">
+                    For testing, use HMRC's sandbox environment with test credentials 
+                    from the HMRC Developer Hub.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4" id="authUrlContainer" style="display: none;">
+    <div class="col-md-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Authorization URL</h5>
+            </div>
+            <div class="card-body">
+                <p>Click the link below or copy and paste it into your browser:</p>
+                <div class="input-group mb-3">
+                    <input type="text" id="authUrl" class="form-control" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyUrl()">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                </div>
+                <a id="authLink" href="#" target="_blank" class="btn btn-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> Open Authorization URL
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            checkAuthStatus();
+        });
+
+        function checkAuthStatus() {
+            $.ajax({
+                url: API_BASE_URL + '/api/auth/status',
+                method: 'GET',
+                success: function(response) {
+                    displayAuthStatus(response.isAuthenticated);
+                },
+                error: function() {
+                    displayAuthStatus(false);
+                    showAlert('Failed to check authentication status', 'warning');
+                }
+            });
+        }
+
+        function displayAuthStatus(isAuthenticated) {
+            const statusIndicator = $('#statusIndicator');
+            const statusText = $('#statusText');
+            const statusDetail = $('#statusDetail');
+
+            if (isAuthenticated) {
+                statusIndicator.html('<i class="bi bi-check-circle-fill text-success" style="font-size: 3em;"></i>');
+                statusText.html('<span class="text-success">Authenticated with HMRC</span>');
+                statusDetail.text('You can submit CT600 returns');
+                $('#authenticatedActions').show();
+                $('#notAuthenticatedActions').hide();
+            } else {
+                statusIndicator.html('<i class="bi bi-x-circle-fill text-danger" style="font-size: 3em;"></i>');
+                statusText.html('<span class="text-danger">Not Authenticated</span>');
+                statusDetail.text('You need to authenticate to submit CT600 returns');
+                $('#notAuthenticatedActions').show();
+                $('#authenticatedActions').hide();
+            }
+        }
+
+        function startAuth() {
+            showAlert('Requesting authorization URL...', 'info');
+
+            $.ajax({
+                url: API_BASE_URL + '/api/auth/authorize',
+                method: 'GET',
+                success: function(response) {
+                    showAlert('Authorization URL generated successfully', 'success');
+                    displayAuthUrl(response.authorizationUrl);
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON?.error || 'Failed to get authorization URL';
+                    showAlert(errorMsg, 'danger');
+                }
+            });
+        }
+
+        function displayAuthUrl(url) {
+            $('#authUrl').val(url);
+            $('#authLink').attr('href', url);
+            $('#authUrlContainer').show();
+            
+            // Scroll to the URL container
+            $('html, body').animate({
+                scrollTop: $('#authUrlContainer').offset().top - 100
+            }, 500);
+        }
+
+        function copyUrl() {
+            const urlInput = document.getElementById('authUrl');
+            urlInput.select();
+            urlInput.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                document.execCommand('copy');
+                showAlert('Authorization URL copied to clipboard!', 'success');
+            } catch (err) {
+                showAlert('Failed to copy URL. Please copy manually.', 'warning');
+            }
+        }
+    </script>
+}
